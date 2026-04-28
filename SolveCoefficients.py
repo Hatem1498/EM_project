@@ -2,9 +2,62 @@ import numpy as np
 from scipy.special import riccati_jn, riccati_yn, legendre, lpmv, lpmn
 import sympy as sp
 import matplotlib.pyplot as plt
-eps_0 = 8.854*10e-12
-mu_0 =  4*np.pi*10e-7
+import math
+eps_0 = 8.854e-12
+mu_0 =  4*np.pi*10**(-7)
 eta_0 = np.sqrt(mu_0/eps_0)
+def hankel2wow(B, r, n):
+    # Unpack the tuples FIRST
+    jn, jn_p = riccati_jn(n, B * r)
+    yn, yn_p = riccati_yn(n, B * r)
+    
+    # Then do the complex math on the arrays
+    normal = jn - 1j * yn
+    derivative = jn_p - 1j * yn_p
+    
+    # Slice off the n=0 order
+    return normal[1:], derivative[1:]
+
+def hankel1wow(B, r, n):
+    jn, jn_p = riccati_jn(n, B * r)
+    yn, yn_p = riccati_yn(n, B * r)
+    
+    normal = jn + 1j * yn
+    derivative = jn_p + 1j * yn_p
+    
+    return normal[1:], derivative[1:]
+
+def besselwow(B, r, n):
+    normal, derivative = riccati_jn(n, B * r)
+    return normal[1:], derivative[1:]
+
+def Bcal(c,Beta,radius):
+    # --- RCS Calculation ---
+    # np.arange is safer for exact integers than np.linspace
+    g = np.arange(1, c + 1) 
+
+    m = np.sqrt(2.56)
+
+    # 1. Calculate the arrays exactly ONCE to save processing time
+    psi_x, d_psi_x   = besselwow(Beta[0], radius[0], c)  # Outside boundary (x)
+    psi_mx, d_psi_mx = besselwow(Beta[1], radius[0], c)  # Inside boundary (mx)
+    zeta_x, d_zeta_x = hankel2wow(Beta[0], radius[0], c) # Hankel outside
+
+    # 2. Correct standard Mie formula for the b_n (TE/Magnetic) coefficient
+    num = (m * psi_mx * d_psi_x) - (psi_x * d_psi_mx)
+    den = (m * psi_mx * d_zeta_x) - (zeta_x * d_psi_mx)
+
+    b_n = num / den
+
+    # 3. Incident wave weighting (Using standard 1j**g)
+    a_n_weight = (1j**g) * ((2 * g + 1) / (g * (g + 1)))
+
+    # Final combined term for the RCS summation
+    breal = b_n * a_n_weight
+    return breal
+
+
+
 
 
 def hankel2(x,n):
@@ -21,8 +74,7 @@ def bessel(x,n):
 
 def leg_diff(n, x):
     normal, derivative = lpmn(1, n, x)
-    return derivative[1, n]
-
+    return normal[1,n],derivative[1, n]
 
 
 def populate_Amatrix():
@@ -124,29 +176,103 @@ def populate_Bmatrix():
 #r=sp.symbols('r:3')
 #n=sp.symbols('n')
 
+
+#populating matrix and solving for the expasion coefficients
 A=populate_Amatrix()
 b=populate_Bmatrix()
 print("matrix passed")
 #sp.pprint(A, num_columns=10_000)
-print(A)
-print(b.shape)
 sol=A.LUsolve(b)
 
-E_0=1
-print(sol[1])
+
+#defining symbolic letters
+B=sp.symbols('B:4')
+eta=sp.symbols('eta:4')
+r=sp.symbols('r:3')
+n=sp.symbols('n')
+x0,x1,x2,x3,x4,x5=sp.symbols('x:6')
+flat_vars = (
+        x0, x1, x2, x3, x4, x5, 
+        *B,   
+        *r,   
+        *eta,
+        n
+    )
+#transfering from sympy to numpy
+solnumber=sp.lambdify(flat_vars,sol,modules=['scipy','numpy'])
 
 
+#defining problem
+eps_list = np.array([1,50,1,4])
+freq = np.linspace(0.5e9,2e9,200)
+layers = 3
+radius = np.array([81e-3, 27e-3, 20e-3])
+n=68
+theta=(np.pi/2)
+phi=np.pi
 
-#A_theta = lambda theta: np.abs((1j**n*( sol[0]*np.sin(theta)*leg_diff(n, np.cos(theta))-sol[1]*lpmv(1, n, np.cos(theta))/np.sin(theta) )))**2
-#A_phi = lambda theta: np.abs( 1j**n*( sol[0]*lpmv(1, n, np.cos(theta))/np.sin(theta)-sol[1]*np.sin(theta)*leg_diff(n, np.cos(theta)) ) )**2
-#RCS = lambda phi, theta: lambda_list[0]**2/np.pi*(np.cos(phi)**2*A_theta(theta)+np.sin(phi)**2*A_phi(theta))
+
+#setting up lists
+sol_list=np.zeros((len(freq),n,4*layers,1), dtype='complex_')
+RCS_list=np.zeros((len(freq),1), dtype='complex_')
+
+for i in range(len(freq)):
+    print((i/len(freq))*100,"%")
+
+    #calculating relevant constants
+    lambda_list = 3e8/np.sqrt(eps_list)/freq[i]
+    Beta=2*np.pi/lambda_list
+    etav=eta_0/np.sqrt(eps_list)
     
-#sum=sum+RCS(0,90)
-#y_axis[i]=sum    
+    #error check
+    b=np.array(Bcal(n,Beta,radius),dtype='complex_')
+    
+    sumAtheta=0
+    sumAphi=0
+    amount=math.ceil((2*np.pi/lambda_list[0])*radius[0]+10)
+    for order in range(1,amount):
+        #evaluating our expression
+        sol_list[i][order-1]=solnumber(Beta[0]*radius[0], Beta[1]*radius[0], Beta[1]*radius[1],  Beta[2]*radius[1],  Beta[2]*radius[2],  Beta[3]*radius[2],*Beta,*radius,*etav,order )
+        
+        #print("order",order)
+        #print("solved b",sol_list[i][order-1][0])
+        #print("theo b",b[order-1])
 
-#lambda_0 = lambda f: 3*10e8/f
-#lam=3*10e8/frequencies
-#plt.plot(frequencies,10*np.log10(y_axis/(np.pi*r[0]**2)))
-#plt.plot(frequencies,10*np.log10(y_axis/(np.pi*r[0]**2)))
-#plt.show()
-#Etheta = lambda r,theta,phi: (-1j*E_0/(w*eps_list[0]*r))(B[0]/w)*np.cos(phi)*(a_n*bessel(B[0],r,n)+sol[0]*hankel2(B[0],r,n))*legendre(cos())
+        #check for numerical errors
+        if all(abs(x)<1e-10 for x in sol_list[i][order-1]):
+            break; 
+        #print("diff",abs(sol_list[i][order-1][0])-abs(b[order-1]) )
+        
+
+        #A_theta = ((-1)**order)*(2*order+1)*(sol_list[i][order-1][0]-sol_list[i][order-1][1])/2
+        
+        
+        #A_theta = ((-1)**order)*(2*order+1)/(hankel2wow(Beta[0],radius[0],order)[0][order-1]*hankel2wow(Beta[0],radius[0],order)[1][order-1])
+        A_theta = ((1j)**order)*((-1)**order)*order*((order+1)/2)*(sol_list[i][order-1][0]-sol_list[i][order-1][1])
+        
+
+
+        #A_theta = (1j**order*( sol_list[i][order-1][0]*np.sin(theta)*leg_diff(order, np.cos(theta))[1]-sol_list[i][order-1][1]*leg_diff(order, np.cos(theta))[0]/np.sin(theta) ))
+        #A_phi =  1j**order*( sol_list[i][order-1][0]*leg_diff(order, np.cos(theta))[0]/np.sin(theta)-sol_list[i][order-1][1]*np.sin(theta)*leg_diff(order, np.cos(theta))[1] )
+        sumAtheta=sumAtheta+A_theta
+        sumAphi=0   
+    #print(sumAphi)
+    #print(sumAtheta)
+    RCS = ((lambda_list[0]**2)/(np.pi))*(np.cos(phi)**2*(abs(sumAtheta)**2))
+    RCS_list[i]=RCS
+
+
+
+#print("Beta",Beta)
+#print("sol",sol_list[0][0][1])
+#print("b_real",breal)
+#sol_list=np.zeros((len(freq),n-1,4*layers,1), dtype='complex_')
+#print("dif",sol_list[0][:][1][0]-breal)
+#print(radius[0])
+#print(sol_list)
+
+lam=3e8/freq
+print(RCS_list)
+plt.plot(freq,10*np.log10(np.absolute(RCS_list)/(np.pi*radius[0]**2)))
+
+plt.show()
