@@ -104,14 +104,15 @@ for i, f in enumerate(freqs):
     limit = math.ceil((2 * np.pi / lambdas[0]) * radius[0] + 10)
     sum_a_theta = 0j
     
+    #Calculate the x arguments for each frequency.
+    x_args = []
+    for j in range(len(radius)):
+        x_args.append(betas[j] * radius[j])
+        x_args.append(betas[j+1] * radius[j])
+
     for order in range(1, limit):
         # Map physical parameters to the symbolic arguments
-        args = (
-            betas[0]*radius[0], betas[1]*radius[0], # x0, x1
-            betas[1]*radius[1], betas[2]*radius[1], # x2, x3
-            betas[2]*radius[2], betas[3]*radius[2], # x4, x5
-            *betas, *radius, *etas, order
-        )
+        args = (*x_args, *betas, *radius, *etas, order)
         
         sol_n = sol_func(*args)
         
