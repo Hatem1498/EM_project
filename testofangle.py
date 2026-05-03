@@ -203,61 +203,53 @@ solnumber=sp.lambdify(flat_vars,sol,modules=['scipy','numpy'])
 
 
 #defining problem
-eps_list = np.array([1,2.56,2.56,2.56])
-freq = np.linspace(0.1e9,100e9,20)
-layers = 3  
-radius = np.array([81e-3, 27e-3, 20e-3])
-n=400
-theta=(np.pi)
+eps_list = np.array([1,4,1,50])
+freq = 10.08e9 
+layers = 3
+radius = np.array([12e-3, 4e-3, 3e-3])
+n=68
+#-0.99999*np.pi
+theta=np.linspace(0,2*np.pi,160)
 phi=np.pi
 
 
 #setting up lists
-sol_list=np.zeros((len(freq),n,4*layers,1), dtype='complex_')
-RCS_list=np.zeros((len(freq),1), dtype='complex_')
+sol_list=np.zeros((n,4*layers,1), dtype='complex_')
+RCS_list=np.zeros((len(theta),1), dtype='complex_')
 
-for i in range(len(freq)):
-    print((i/len(freq))*100,"%")
+#calculating relevant constants
+lambda_list = 3e8/np.sqrt(eps_list)/freq
+Beta=2*np.pi/lambda_list
+etav=eta_0/np.sqrt(eps_list)
 
-    #calculating relevant constants
-    lambda_list = 3e8/np.sqrt(eps_list)/freq[i]
-    Beta=2*np.pi/lambda_list
-    etav=eta_0/np.sqrt(eps_list)
+#error check
+b=np.array(Bcal(n,Beta,radius),dtype='complex_')
+
+sumAtheta=np.zeros(len(theta),dtype='complex_')
+sumAphi=np.zeros(len(theta),dtype='complex_')
+amount=math.ceil((2*np.pi/lambda_list[0])*radius[0]+10)
+for order in range(1,amount):
+    #evaluating our expression
+    sol_list[order-1]=solnumber(Beta[0]*radius[0], Beta[1]*radius[0], Beta[1]*radius[1],  Beta[2]*radius[1],  Beta[2]*radius[2],  Beta[3]*radius[2],*Beta,*radius,*etav,order )
+    print(sol_list[order-1])
+    #check for numerical errors
+    if all(abs(x)<1e-10 for x in sol_list[order-1]):
+        break; 
     
-    #error check
-    b=np.array(Bcal(n,Beta,radius),dtype='complex_')
     
-    sumAtheta=0
-    sumAphi=0
-    amount=math.ceil((2*np.pi/lambda_list[0])*radius[0]+10)
-    for order in range(1,amount):
-        #evaluating our expression
-        sol_list[i][order-1]=solnumber(Beta[0]*radius[0], Beta[1]*radius[0], Beta[1]*radius[1],  Beta[2]*radius[1],  Beta[2]*radius[2],  Beta[3]*radius[2],*Beta,*radius,*etav,order )
-        
-        #print("order",order)
-        #print("solved b",sol_list[i][order-1][0])
-        #print("theo b",b[order-1])
 
-        #check for numerical errors
-        if all(abs(x)<1e-10 for x in sol_list[i][order-1]):
-            break; 
-        #print("diff",abs(sol_list[i][order-1][0])-abs(b[order-1]) )
+    
+    for i in range(len(theta)):
+        A_theta = (1j**order*( sol_list[order-1][0]*np.sin(theta[i])*leg_diff(order, np.cos(theta[i]))[1]-sol_list[order-1][1]*leg_diff(order, np.cos(theta[i]))[0]/np.sin(theta[i]) ))
         
-
-        #A_theta = ((-1)**order)*(2*order+1)*(sol_list[i][order-1][0]-sol_list[i][order-1][1])/2
+        A_phi =  1j**order*( sol_list[order-1][0]*leg_diff(order, np.cos(theta[i]))[0]/np.sin(theta[i])-sol_list[order-1][1]*np.sin(theta[i])*leg_diff(order, np.cos(theta[i]))[1] )
+        sumAtheta[i]+=A_theta.item()
         
-        A_theta = ((1j)**order)*((-1)**order)*order*((order+1)/2)*(sol_list[i][order-1][0]-sol_list[i][order-1][1])
-        
-
-
-        #A_theta = (1j**order*( sol_list[i][order-1][0]*np.sin(theta)*leg_diff(order, np.cos(theta))[1]-sol_list[i][order-1][1]*leg_diff(order, np.cos(theta))[0]/np.sin(theta) ))
-        #A_phi =  1j**order*( sol_list[i][order-1][0]*leg_diff(order, np.cos(theta))[0]/np.sin(theta)-sol_list[i][order-1][1]*np.sin(theta)*leg_diff(order, np.cos(theta))[1] )
-        sumAtheta=sumAtheta+A_theta
-        sumAphi=0   
+        sumAphi[i]+=A_phi.item()
     #print(sumAphi)
     #print(sumAtheta)
-    RCS = ((lambda_list[0]**2)/(np.pi))*(np.cos(phi)**2*(abs(sumAtheta)**2))
-    RCS_list[i]=RCS
+RCS = ((lambda_list[0]**2)/(np.pi))*((np.cos(phi)**2)*(abs(sumAtheta)**2)+(np.sin(phi)**2)*abs(sumAphi)**2)
+
 
 
 
@@ -270,7 +262,10 @@ for i in range(len(freq)):
 #print(sol_list)
 
 lam=3e8/freq
-print(RCS_list)
-plt.plot(freq,10*np.log10(np.absolute(RCS_list)/(np.pi*radius[0]**2)))
+
+fig, ax = plt.subplots(subplot_kw={'projection': 'polar'})
+ax.plot(theta,10*np.log10(np.absolute(RCS)/(np.pi*radius[0]**2)) )
+#plt.plot(theta,10*np.log10(np.absolute(RCS)/(lam**2)))
 
 plt.show()
+ 

@@ -44,16 +44,16 @@ def Bcal(c,Beta,radius):
     zeta_x, d_zeta_x = hankel2wow(Beta[0], radius[0], c) # Hankel outside
 
     # 2. Correct standard Mie formula for the b_n (TE/Magnetic) coefficient
-    num = (m * psi_mx * d_psi_x) - (psi_x * d_psi_mx)
-    den = (m * psi_mx * d_zeta_x) - (zeta_x * d_psi_mx)
+    #num = (m * psi_mx * d_psi_x) - (psi_x * d_psi_mx)
+    #den = (m * psi_mx * d_zeta_x) - (zeta_x * d_psi_mx)
 
-    b_n = num / den
+    b_n = d_psi_x/d_zeta_x
 
     # 3. Incident wave weighting (Using standard 1j**g)
     a_n_weight = (1j**g) * ((2 * g + 1) / (g * (g + 1)))
 
     # Final combined term for the RCS summation
-    breal = b_n * a_n_weight
+    breal = -b_n * a_n_weight
     return breal
 
 
@@ -203,12 +203,12 @@ solnumber=sp.lambdify(flat_vars,sol,modules=['scipy','numpy'])
 
 
 #defining problem
-eps_list = np.array([1,2.56,2.56,2.56])
-freq = np.linspace(0.1e9,100e9,20)
-layers = 3  
-radius = np.array([81e-3, 27e-3, 20e-3])
-n=400
-theta=(np.pi)
+eps_list = np.array([1,4,1,50])
+freq = np.linspace(5e9,15e9,50)
+layers = 3
+radius = np.array([12e-3, 4e-3, 3e-3])
+n=68
+theta=(np.pi/2)
 phi=np.pi
 
 
@@ -246,17 +246,19 @@ for i in range(len(freq)):
 
         #A_theta = ((-1)**order)*(2*order+1)*(sol_list[i][order-1][0]-sol_list[i][order-1][1])/2
         
-        A_theta = ((1j)**order)*((-1)**order)*order*((order+1)/2)*(sol_list[i][order-1][0]-sol_list[i][order-1][1])
         
+        #A_theta = ((-1)**order)*(2*order+1)/(hankel2wow(Beta[0],radius[0],order)[0][order-1]*hankel2wow(Beta[0],radius[0],order)[1][order-1])
+        #A_theta = ((1j)**order)*((-1)**order)*order*((order+1)/2)*(sol_list[i][order-1][0]-sol_list[i][order-1][1])
+        A_theta = ((1j)**order)*order*((order+1)/2)*(sol_list[i][order-1][0]+sol_list[i][order-1][1])        
 
 
         #A_theta = (1j**order*( sol_list[i][order-1][0]*np.sin(theta)*leg_diff(order, np.cos(theta))[1]-sol_list[i][order-1][1]*leg_diff(order, np.cos(theta))[0]/np.sin(theta) ))
         #A_phi =  1j**order*( sol_list[i][order-1][0]*leg_diff(order, np.cos(theta))[0]/np.sin(theta)-sol_list[i][order-1][1]*np.sin(theta)*leg_diff(order, np.cos(theta))[1] )
-        sumAtheta=sumAtheta+A_theta
+        sumAtheta=sumAtheta+A_theta 
         sumAphi=0   
     #print(sumAphi)
     #print(sumAtheta)
-    RCS = ((lambda_list[0]**2)/(np.pi))*(np.cos(phi)**2*(abs(sumAtheta)**2))
+    RCS = ((lambda_list[0]**2)/(np.pi))*(abs(sumAtheta)**2)
     RCS_list[i]=RCS
 
 
