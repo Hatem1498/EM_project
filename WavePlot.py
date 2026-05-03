@@ -43,7 +43,7 @@ b_func = sp.lambdify(flat_vars, b_sym, modules=['scipy', 'numpy'])
 eps_list = np.array([1,2.56,2.56,2.56])
 freq =10e9
 layers = 3
-radius = np.array([30e-3, 4e-3, 3e-3])
+radius = np.array([30e-3, 20e-3, 10e-3])
 n=101
 rad = np.linspace(0.00001, radius[0]*3, 500)
 # Force inclusion of boundaries
@@ -138,8 +138,6 @@ for order in range(1,amount):
     for i in range(len(theta)):
         P = P_all[i]
         Pd = Pd_all[i]
-        #print("P-new: ", P)
-        #print("P-old:", leg_diff(order,np.cos(theta[i]))[0]/np.sin(theta[i]))
         for j in range(len(rad)):
             if radius[1] < rad[j] and rad[j] < radius[0]:
                 E_phiimag = (sol[2]*h1[1][j][1] + sol[4]*h2[1][j][1]) * P
