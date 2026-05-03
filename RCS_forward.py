@@ -100,7 +100,7 @@ for i, f in enumerate(freqs):
     betas = 2 * np.pi / lambdas
     etas = ETA_0 / np.sqrt(eps_list)
     
-    # Far-field summation limit
+    # Far-field role of thumb for numbe rof summations needed.
     limit = math.ceil((2 * np.pi / lambdas[0]) * radius[0] + 10)
     sum_a_theta = 0j
     
@@ -120,7 +120,7 @@ for i, f in enumerate(freqs):
             break
             
         # Forward scattering logic (Theta = 0 simplification)
-        # sol_n[0] is b_n, sol_n[1] is a_n
+        # sol_n[0] is b_n, sol_n[1] is c_n
         A_theta_term = ((1j)**order) * order * ((order + 1) / 2) * (sol_n[0] + sol_n[1])
         sum_a_theta += A_theta_term
         
