@@ -20,7 +20,7 @@ sol_func = sp.lambdify(flat_vars, sol_sym, modules=['scipy', 'numpy'])
 
 # --- Simulation Parameters ---
 eps_list = np.array([1, 4, 1, 50])
-freqs = np.linspace(5e9, 15e9, 50)
+freqs = np.linspace(5e9, 15e9, 200)
 radius = np.array([12e-3, 4e-3, 3e-3])
 max_order = 68
 

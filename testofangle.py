@@ -204,12 +204,12 @@ solnumber=sp.lambdify(flat_vars,sol,modules=['scipy','numpy'])
 
 #defining problem
 eps_list = np.array([1,4,1,50])
-freq = 10.08e9 
+freq = 10.7e9 
 layers = 3
 radius = np.array([12e-3, 4e-3, 3e-3])
 n=68
 #-0.99999*np.pi
-theta=np.linspace(0,2*np.pi,160)
+theta=np.linspace(0.0001,1.999*np.pi,160)
 phi=np.pi
 
 
@@ -262,7 +262,6 @@ RCS = ((lambda_list[0]**2)/(np.pi))*((np.cos(phi)**2)*(abs(sumAtheta)**2)+(np.si
 #print(sol_list)
 
 lam=3e8/freq
-
 fig, ax = plt.subplots(subplot_kw={'projection': 'polar'})
 ax.plot(theta,10*np.log10(np.absolute(RCS)/(np.pi*radius[0]**2)) )
 #plt.plot(theta,10*np.log10(np.absolute(RCS)/(lam**2)))

@@ -209,9 +209,9 @@ freq =10e9
 layers = 3
 radius = np.array([30e-3, 4e-3, 3e-3])
 n=101
-rad=np.linspace(0.00001,radius[0]*3,500)
+rad=np.linspace(0.00001,radius[0]*3,100)
 #-0.99999*np.pi
-theta=np.linspace(0.001,1.999*np.pi,500)
+theta=np.linspace(0.001,1.999*np.pi,100)
 phi=np.pi/2
 E0=1
 
