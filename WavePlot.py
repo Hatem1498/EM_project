@@ -46,13 +46,13 @@ freq =10e9
 layers = 3
 radius = np.array([30e-3, 6e-3, 3e-3])
 n=101
-rad = np.linspace(0.00001, radius[0]*3, 500)
+rad = np.linspace(0.00001, radius[0]*3, 200)
 # Force inclusion of boundaries
 rad = np.unique(np.concatenate([rad, [radius[0], radius[1], radius[2]]]))
 rad.sort()
 #-0.99999*np.pi
-theta=np.linspace(0.001,1.999*np.pi,500)
-phi=np.pi/2
+theta=np.linspace(0.001,1.999*np.pi,200)
+phi=np.pi
 E0=1
 
 #calculating relevant constants
@@ -76,7 +76,7 @@ sol_list=np.zeros((n,4*layers), dtype='complex128')
 
 #amount=50
 constimagtheta=np.zeros((layers+1,len(rad)), dtype='complex128')
-constrealtheta=np.zeros((layers+1,len(rad),len(theta)), dtype='complex128')
+constrealtheta=np.zeros((layers+1,len(rad)), dtype='complex128')
 constimagphi=np.zeros((layers+1,len(rad)), dtype='complex128')
 constrealphi=np.zeros((layers+1,len(rad)), dtype='complex128')
 constradial = np.zeros((layers+1, len(rad)), dtype='complex128')
@@ -84,8 +84,8 @@ constradial = np.zeros((layers+1, len(rad)), dtype='complex128')
 #for the electrical fields
 for i in range(layers+1):
     #theta
-    constimagtheta[i]=-1j*E0*Beta[i]*np.cos(phi)/(((freq*2*np.pi)**2)*eps_list[i]*EPS*rad)
-    constrealtheta[i]=-E0*np.cos(phi)/(eps_list[i]*EPS*np.outer(rad,np.sin(theta))*freq*2*np.pi*etav[i])
+    constimagtheta[i]=-1j*E0*np.cos(phi)/(Beta[i]*rad)
+    constrealtheta[i]=-E0*np.cos(phi)/(Beta[i]*rad)
     #phi
     constimagphi[i]=1j*E0*np.sin(phi)/(Beta[i]*rad)
     constrealphi[i]=E0*np.sin(phi)/(Beta[i]*rad)
@@ -149,12 +149,13 @@ for order in range(1,amount):
                 E_phiimag = (sol[2]*h1[1][r][1] + sol[4]*h2[1][r][1]) * P
                 E_phireal = (sol[3]*h1[1][r][0] + sol[5]*h2[1][r][0]) * Pd
                 E_phi[i][r] += (constimagphi[1][r]*E_phiimag + constrealphi[1][r]*E_phireal)
+                
                 E_r_imag = ( n_t*(n_t+1)*(sol[2]*h1[1][r][0]+sol[4]*h2[1][r][0]) ) * P
                 E_r[i][r] += constradial[1][r]*E_r_imag
 
                 E_thetaimag = (sol[2]*h1[1][r][1] + sol[4]*h2[1][r][1])*Pd
                 E_thetareal= (sol[3]*h1[1][r][0] + sol[5]*h2[1][r][0])*P
-                E_theta[i][r] += (constrealtheta[1][r][i]*E_thetareal+constimagtheta[1][r]*E_thetaimag)
+                E_theta[i][r] += (constrealtheta[1][r]*E_thetareal+constimagtheta[1][r]*E_thetaimag)
 
             elif radius[2] < rad[r] and rad[r] < radius[1]: #layer 2 (second layer inside sphere)
                 E_phiimag = (sol[6]*h1[2][r][1] + sol[8]*h2[2][r][1]) * P
@@ -165,7 +166,7 @@ for order in range(1,amount):
 
                 E_thetaimag = (sol[6]*h1[2][r][1] + sol[8]*h2[2][r][1])*Pd
                 E_thetareal= (sol[7]*h1[2][r][0] + sol[9]*h2[2][r][0])*P
-                E_theta[i][r] += (constrealtheta[2][r][i]*E_thetareal+constimagtheta[2][r]*E_thetaimag)
+                E_theta[i][r] += (constrealtheta[2][r]*E_thetareal+constimagtheta[2][r]*E_thetaimag)
 
             elif rad[r] < radius[2]: #layer 3 (third layer inside sphere), this is where origin is.
                 E_phiimag = sol[10]*b[3][r][1] * P
@@ -176,7 +177,7 @@ for order in range(1,amount):
 
                 E_thetaimag = (sol[10]*b[3][r][1])*Pd
                 E_thetareal= (sol[11]*b[3][r][0])*P
-                E_theta[i][r] += (constrealtheta[3][r][i]*E_thetareal + constimagtheta[3][r]*E_thetaimag)
+                E_theta[i][r] += (constrealtheta[3][r]*E_thetareal + constimagtheta[3][r]*E_thetaimag)
 
             else: #Outside the sphere (layer 0)
                 E_phiimag = (a_n*b[0][r][1] + sol[0]*h2[0][r][1]) * P
@@ -185,7 +186,7 @@ for order in range(1,amount):
 
                 E_thetaimag = (a_n*b[0][r][1]+sol[0]*h2[0][r][1])*Pd
                 E_thetareal= (a_n*b[0][r][0]+sol[1]*h2[0][r][0])*P
-                E_theta[i][r] += (constrealtheta[0][r][i]*E_thetareal+constimagtheta[0][r]*E_thetaimag)
+                E_theta[i][r] += (constrealtheta[0][r]*E_thetareal+constimagtheta[0][r]*E_thetaimag)
 
                 E_r_imag = ( n_t*(n_t+1)*(a_n*b[0][r][0]+sol[0]*h2[0][r][0]) ) * P
                 E_r[i][r] += constradial[0][r]*E_r_imag
@@ -207,7 +208,7 @@ fig, ax = plt.subplots(subplot_kw={'projection': 'polar'}, figsize=(8, 6))
 
 # 5. Plot the data using pcolormesh
 # shading='auto' (or 'nearest') handles how the colors fill the grid cells
-c = ax.pcolormesh(Theta, R, abs(E_phi).T, cmap='viridis', shading='auto',vmin=0,vmax=2)
+c = ax.pcolormesh(Theta, R, abs(E_r).T, cmap='viridis', shading='auto',vmin=0,vmax=2)
 
 # 6. Add a colorbar and styling
 fig.colorbar(c, ax=ax, label='Matrix Value')
