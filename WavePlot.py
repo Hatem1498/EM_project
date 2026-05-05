@@ -43,7 +43,7 @@ b_func = sp.lambdify(flat_vars, b_sym, modules=['scipy', 'numpy'])
 eps_list = np.array([1,2.56,2.56,2.56])
 freq =10e9
 layers = 3
-radius = np.array([30e-3, 20e-3, 10e-3])
+radius = np.array([30e-3, 4e-3, 3e-3])
 n=101
 rad = np.linspace(0.00001, radius[0]*3, 500)
 # Force inclusion of boundaries

@@ -19,9 +19,9 @@ flat_vars = (*sym_vars[0], *sym_vars[1], *sym_vars[2], *sym_vars[3], sym_vars[4]
 sol_func = sp.lambdify(flat_vars, sol_sym, modules=['scipy', 'numpy'])
 
 # --- Simulation Parameters ---
-eps_list = np.array([1, 4, 1, 50])
-freqs = np.linspace(5e9, 15e9, 200)
-radius = np.array([12e-3, 4e-3, 3e-3])
+eps_list = np.array([1, 1+1j*1000, 1+1j*1000, 1+1j*1000])
+freqs = np.linspace(1e9, 2e9, 200)
+radius = np.array([81e-3, 27e-3, 20e-3])
 max_order = 68
 
 rcs_results = []
