@@ -1,5 +1,5 @@
 import numpy as np
-from scipy.special import riccati_jn, riccati_yn, legendre, lpmv, lpmn
+from scipy.special import riccati_jn, riccati_yn, legendre, lpmv
 import sympy as sp
 import matplotlib.pyplot as plt
 import math
@@ -40,10 +40,11 @@ A_func = sp.lambdify(flat_vars, A_sym, modules=['scipy', 'numpy'])
 b_func = sp.lambdify(flat_vars, b_sym, modules=['scipy', 'numpy'])
 
 #defining problem
+#eps_list = np.array([1,1+1j*10e3,1+1j*10e3,1+1j*10e3])
 eps_list = np.array([1,2.56,2.56,2.56])
 freq =10e9
 layers = 3
-radius = np.array([30e-3, 20e-3, 10e-3])
+radius = np.array([30e-3, 6e-3, 3e-3])
 n=101
 rad = np.linspace(0.00001, radius[0]*3, 500)
 # Force inclusion of boundaries
@@ -59,22 +60,26 @@ lambda_list = 3e8/np.sqrt(eps_list)/freq
 Beta=2*np.pi/lambda_list
 etav=ETA_0/np.sqrt(eps_list)
 
+
+
 #error check
-b=np.array(Bcal(n,Beta,radius),dtype='complex_')
+#b=np.array(Bcal(n,Beta,radius),dtype='complex128')
 
 #definign plotting matrixes
-E_theta=np.zeros((len(theta),len(rad)),dtype='complex_')
-E_phi=np.zeros((len(theta),len(rad)),dtype='complex_')
-amount=math.ceil((2*np.pi/lambda_list[0])*radius[0]+10)
+E_theta=np.zeros((len(theta),len(rad)),dtype='complex128')
+E_phi=np.zeros((len(theta),len(rad)),dtype='complex128')
+E_r = np.zeros((len(theta),len(rad)),dtype='complex128')
+amount=math.ceil(np.real((2*np.pi/lambda_list[0])*radius[0]+10))
 
 #setting up solving lists
-sol_list=np.zeros((n,4*layers), dtype='complex_')
+sol_list=np.zeros((n,4*layers), dtype='complex128')
 
 #amount=50
-constimagtheta=np.zeros((layers+1,len(rad)), dtype='complex_')
-constrealtheta=np.zeros((layers+1,len(rad),len(theta)), dtype='complex_')
-constimagphi=np.zeros((layers+1,len(rad)), dtype='complex_')
-constrealphi=np.zeros((layers+1,len(rad)), dtype='complex_')
+constimagtheta=np.zeros((layers+1,len(rad)), dtype='complex128')
+constrealtheta=np.zeros((layers+1,len(rad),len(theta)), dtype='complex128')
+constimagphi=np.zeros((layers+1,len(rad)), dtype='complex128')
+constrealphi=np.zeros((layers+1,len(rad)), dtype='complex128')
+constradial = np.zeros((layers+1, len(rad)), dtype='complex128')
 
 #for the electrical fields
 for i in range(layers+1):
@@ -84,11 +89,13 @@ for i in range(layers+1):
     #phi
     constimagphi[i]=1j*E0*np.sin(phi)/(Beta[i]*rad)
     constrealphi[i]=E0*np.sin(phi)/(Beta[i]*rad)
+    constradial[i] = -1j*E0*np.cos(phi)/(Beta[i]*rad)**2
     #print(constimagphi)
     #print(constrealphi)
     #rad
     #constimagrad
     #constrealrad
+    #print(constradial[i])
 
 
 for order in range(1,amount):
@@ -124,10 +131,8 @@ for order in range(1,amount):
         P_all[i] = val / sin_theta[i]
         Pd_all[i] = -sin_theta[i] * deriv
 
-    print(f"Version 1 - theta[0] = {theta[0]}")
-    print(f"P_all[0] = {P_all[0]}")
-    print(f"Pd_all[0] = {Pd_all[0]}")
     # --- Precompute radial functions ---
+    #example h1[0][1] (0 = layer, 1 = rad), so it is indexed h1[l][r]
     h1 = [ [hankel1wow(Beta[l], r, order) for r in rad] for l in range(layers+1) ]
     h2 = [ [hankel2wow(Beta[l], r, order) for r in rad] for l in range(layers+1) ]
     b  = [ [besselwow(Beta[l], r, order)  for r in rad] for l in range(layers+1) ]
@@ -138,29 +143,54 @@ for order in range(1,amount):
     for i in range(len(theta)):
         P = P_all[i]
         Pd = Pd_all[i]
-        for j in range(len(rad)):
-            if radius[1] < rad[j] and rad[j] < radius[0]:
-                E_phiimag = (sol[2]*h1[1][j][1] + sol[4]*h2[1][j][1]) * P
-                E_phireal = (sol[3]*h1[1][j][0] + sol[5]*h2[1][j][0]) * Pd
-                E_phi[i][j] += (constimagphi[1][j]*E_phiimag + constrealphi[1][j]*E_phireal)
+        for r in range(len(rad)):
+            n_t = order
+            if radius[1] < rad[r] and rad[r] < radius[0]: #layer 1 (first layer in sphere)
+                E_phiimag = (sol[2]*h1[1][r][1] + sol[4]*h2[1][r][1]) * P
+                E_phireal = (sol[3]*h1[1][r][0] + sol[5]*h2[1][r][0]) * Pd
+                E_phi[i][r] += (constimagphi[1][r]*E_phiimag + constrealphi[1][r]*E_phireal)
+                E_r_imag = ( n_t*(n_t+1)*(sol[2]*h1[1][r][0]+sol[4]*h2[1][r][0]) ) * P
+                E_r[i][r] += constradial[1][r]*E_r_imag
 
-            elif radius[2] < rad[j] and rad[j] < radius[1]:
-                E_phiimag = (sol[6]*h1[2][j][1] + sol[8]*h2[2][j][1]) * P
-                E_phireal = (sol[7]*h1[2][j][0] + sol[9]*h2[2][j][0]) * Pd
-                E_phi[i][j] += (constimagphi[2][j]*E_phiimag + constrealphi[2][j]*E_phireal)
+                E_thetaimag = (sol[2]*h1[1][r][1] + sol[4]*h2[1][r][1])*Pd
+                E_thetareal= (sol[3]*h1[1][r][0] + sol[5]*h2[1][r][0])*P
+                E_theta[i][r] += (constrealtheta[1][r][i]*E_thetareal+constimagtheta[1][r]*E_thetaimag)
 
-            elif rad[j] < radius[2]:
-                E_phiimag = sol[10]*b[3][j][1] * P
-                E_phireal = sol[11]*b[3][j][0] * Pd
-                E_phi[i][j] += (constimagphi[3][j]*E_phiimag + constrealphi[3][j]*E_phireal)
+            elif radius[2] < rad[r] and rad[r] < radius[1]: #layer 2 (second layer inside sphere)
+                E_phiimag = (sol[6]*h1[2][r][1] + sol[8]*h2[2][r][1]) * P
+                E_phireal = (sol[7]*h1[2][r][0] + sol[9]*h2[2][r][0]) * Pd
+                E_phi[i][r] += (constimagphi[2][r]*E_phiimag + constrealphi[2][r]*E_phireal)
+                E_r_imag = ( n_t*(n_t+1)*(sol[6]*h1[2][r][0]+sol[8]*h2[2][r][0]) ) * P
+                E_r[i][r] += constradial[2][r]*E_r_imag
 
-            else:
-                E_phiimag = (a_n*b[0][j][1] + sol[0]*h2[0][j][1]) * P
-                E_phireal = (a_n*b[0][j][0] + sol[1]*h2[0][j][0]) * Pd
-                E_phi[i][j] += (constimagphi[0][j]*E_phiimag + constrealphi[0][j]*E_phireal)
+                E_thetaimag = (sol[6]*h1[2][r][1] + sol[8]*h2[2][r][1])*Pd
+                E_thetareal= (sol[7]*h1[2][r][0] + sol[9]*h2[2][r][0])*P
+                E_theta[i][r] += (constrealtheta[2][r][i]*E_thetareal+constimagtheta[2][r]*E_thetaimag)
 
+            elif rad[r] < radius[2]: #layer 3 (third layer inside sphere), this is where origin is.
+                E_phiimag = sol[10]*b[3][r][1] * P
+                E_phireal = sol[11]*b[3][r][0] * Pd
+                E_phi[i][r] += (constimagphi[3][r]*E_phiimag + constrealphi[3][r]*E_phireal)
+                E_r_imag =  n_t*(n_t+1)*(sol[10]*b[3][r][0]) * P
+                E_r[i][r] += constradial[3][r]*E_r_imag
+
+                E_thetaimag = (sol[10]*b[3][r][1])*Pd
+                E_thetareal= (sol[11]*b[3][r][0])*P
+                E_theta[i][r] += (constrealtheta[3][r][i]*E_thetareal + constimagtheta[3][r]*E_thetaimag)
+
+            else: #Outside the sphere (layer 0)
+                E_phiimag = (a_n*b[0][r][1] + sol[0]*h2[0][r][1]) * P
+                E_phireal = (a_n*b[0][r][0] + sol[1]*h2[0][r][0]) * Pd
+                E_phi[i][r] += (constimagphi[0][r]*E_phiimag + constrealphi[0][r]*E_phireal)
+
+                E_thetaimag = (a_n*b[0][r][1]+sol[0]*h2[0][r][1])*Pd
+                E_thetareal= (a_n*b[0][r][0]+sol[1]*h2[0][r][0])*P
+                E_theta[i][r] += (constrealtheta[0][r][i]*E_thetareal+constimagtheta[0][r]*E_thetaimag)
+
+                E_r_imag = ( n_t*(n_t+1)*(a_n*b[0][r][0]+sol[0]*h2[0][r][0]) ) * P
+                E_r[i][r] += constradial[0][r]*E_r_imag
+                
             
-
 
 #print("E_thet",E_theta)
 #print("sol",abs(sol_list))
